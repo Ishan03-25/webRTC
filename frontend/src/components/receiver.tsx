@@ -16,6 +16,14 @@ export default function Receiver() {
                 const pc = new RTCPeerConnection();
                 pcRef.current = pc;
                 pc.setRemoteDescription(message.sdp);
+                pc.onicecandidate = (event) => {
+                    if (event.candidate){
+                        socket?.send(JSON.stringify({type: 'iceCandidate', candidate: event.candidate}));
+                    }
+                }
+                pc.ontrack = (event) => {
+                    
+                }
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
                 socketRef.current?.send(JSON.stringify({type: 'createanswer', sdp: pc.localDescription}));//sdp: answer
@@ -26,6 +34,7 @@ export default function Receiver() {
                 //set the remote description
             } else if (message.type === 'iceCandidate'){
                 //add the ice candidate
+                pcRef.current?.addIceCandidate(message.candidate);
             }
         }
     }, []);

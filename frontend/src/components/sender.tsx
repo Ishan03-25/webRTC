@@ -1,3 +1,4 @@
+
 import { useEffect, useRef } from "react";
 
 export default function Sender(){
@@ -14,21 +15,36 @@ export default function Sender(){
         //Create an offer
         const pc = new RTCPeerConnection();
         pcRef.current = pc;
-        const offer = await pc.createOffer();//sdp
-        await pc.setLocalDescription(offer);
+        pc.onnegotiationneeded = async () => {
+            const offer = await pc.createOffer();//sdp
+            await pc.setLocalDescription(offer);
+            socketRef.current?.send(JSON.stringify({type: 'createoffer', sdp: pc.localDescription}));
+        }
         const socket = socketRef.current;
-        // Either this or below one
+
         if (!socket){
+            alert('Socket not connected yet');
             return;
         }
-        socket.send(JSON.stringify({type: 'createoffer', sdp: pc.localDescription}));
-        // socket?.send(JSON.stringify({type: 'createoffer', sdp: offer}));//offer or pc.localDescription
-        socket.onmessage = (event) => {
+
+        //video/audio
+        pc.onicecandidate = (event) => {
+            if (event.candidate){
+                socket.send(JSON.stringify({type: 'iceCandidate', candidate: event.candidate}));
+            }
+        }
+
+        socket.onmessage = async (event) => {
             const message = JSON.parse(event.data);
             if (message.type === 'createanswer'){
                 pc.setRemoteDescription(message.sdp);
+            } else if (message.type === 'iceCandidate'){
+                pc.addIceCandidate(message.candidate);
             }
         }
+
+        const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: false});
+        pcRef.current?.addTrack(stream.getTracks()[0]);
     }
     return (
         <div>
